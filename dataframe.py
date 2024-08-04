@@ -1,12 +1,13 @@
 import yfinance as yf
 import matplotlib.pyplot as plt
-
+import pandas as pd
+import os
 # Description: Generates dataframe from yfinance and modifies it
 
 
 class dataframe:
     # Class to generate and modify dataframes
-    def __init__(self, ticker, start, end):
+    def __init__(self, ticker, start, end, overwrite=False):
         """
         Get data from Yahoo Finance for a given ticker and date range
         Inputs
@@ -20,7 +21,20 @@ class dataframe:
         self.start = start
         self.end = end
         self.window = 20
-        self.data = yf.download(ticker, start=start, end=end)
+        self.file_path = f'data/{ticker}_{start}_{end}.csv'
+
+        # make local data folder if it doesn't exist
+        if not os.path.exists('data'):
+            os.mkdir('data')
+
+        # Check if the data is already downloaded and handle overwrite logic
+        if os.path.exists(self.file_path) and not overwrite:
+            print('Data already exists')
+            self.data = pd.read_csv(self.file_path)
+        else:
+            print('Downloading data')
+            self.data = yf.download(ticker, start=start, end=end)
+            self.data.to_csv(self.file_path)
 
     def display(self):
         """
@@ -97,7 +111,7 @@ class dataframe:
 
 
 if __name__ == '__main__':
-    apple = dataframe('AAPL', '2020-01-01', '2020-12-31')
+    apple = dataframe('AMD', '2023-01-01', '2024-08-04')
     apple.add_sma()
     apple.add_bands()
     apple.plot(bband=True)
