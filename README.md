@@ -1,0 +1,2 @@
+# algotrader
+Really complicated gambling
