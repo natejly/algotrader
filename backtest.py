@@ -24,4 +24,4 @@ def backtest(ticker, start, end, strategy):
 
 
 if __name__ == '__main__':
-    backtest('BLUE', '2023-01-01', '2024-01-01', bbounds)
+    backtest('BLUE', '2023-01-01', '2024-04-01', bbounds)

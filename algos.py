@@ -1,5 +1,35 @@
 # Runs dataframes through algorithms to generate trading signals
 
+def add_sma(df, window=20):
+    """
+    Add a simple moving average to the dataframe
+
+    Inputs
+    dataframe: dataframe object, data
+    window: int, number of days to calculate the moving average
+    """
+    name = f'{window}d SMA'
+    df.data[name] = df.data['Adj Close'].rolling(window=window).mean()
+
+
+def add_bands(df, window=20, num_std=2):
+    """
+    Add Bollinger Bands to the dataframe
+
+    Inputs
+    df: dataframe object, data
+    window: int, number of days to calculate the moving average
+    num_std: int, number of standard deviations to calculate the bands
+    """
+    df.window = window
+    sma_name = f'{window}d SMA'
+    add_sma(df, window)
+    df.data['Upper Band'] = df.data[sma_name] + \
+        num_std * df.data['Adj Close'].rolling(window=window).std()
+    df.data['Lower Band'] = df.data[sma_name] - \
+        num_std * df.data['Adj Close'].rolling(window=window).std()
+
+
 def bbounds(df):
     """
     Buy when the price is below the lower band
@@ -9,8 +39,8 @@ def bbounds(df):
     Returns
     percent_return: float, percent return of the strategy
     """
-    df.add_sma()
-    df.add_bands()
+    add_sma(df)
+    add_bands(df)
     # Create new column for trading signals
     df.data['bbounds'] = 0
 
