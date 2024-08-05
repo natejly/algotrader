@@ -1,8 +1,8 @@
+# Description: Generates dataframe from yfinance and modifies it
 import yfinance as yf
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
-# Description: Generates dataframe from yfinance and modifies it
 
 
 class dataframe:
@@ -63,7 +63,7 @@ class dataframe:
         """
         print(self.data.tail())
 
-    def plot(self, bband=False, sma=False):
+    def plot(self, bband=False, sma=False, strategy=None):
         """
         Plot the data
 
@@ -78,6 +78,14 @@ class dataframe:
         if sma or bband:
             self.data[f'{self.window}d SMA'].plot(label=f'{self.window}d SMA',
                                                   color='orange')
+        if strategy is not None:
+            buy_signals = self.data[self.data[strategy] == 1].index
+            sell_signals = self.data[self.data[strategy] == -1].index
+            plt.plot(buy_signals, self.data.loc[buy_signals, 'Adj Close'],
+                     '^', markersize=5, color='green', label='Buy Signal')
+            plt.plot(sell_signals, self.data.loc[sell_signals, 'Adj Close'],
+                     'v', markersize=5, color='red', label='Sell Signal')
+
         plt.legend()
         plt.show()
 
@@ -108,11 +116,3 @@ class dataframe:
             num_std * self.data['Adj Close'].rolling(window=window).std()
         self.data['Lower Band'] = self.data[sma_name] - \
             num_std * self.data['Adj Close'].rolling(window=window).std()
-
-
-if __name__ == '__main__':
-    apple = dataframe('AMD', '2023-01-01', '2024-08-04')
-    apple.add_sma()
-    apple.add_bands()
-    apple.plot(bband=True)
-    # apple.chart()
