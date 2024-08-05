@@ -1,7 +1,7 @@
 # main file to run strategies
 
 from dataframe import dataframe
-from algos import bbounds
+from algos import bbounds, hold
 
 
 def backtest(ticker, start, end, strategy):
@@ -14,12 +14,8 @@ def backtest(ticker, start, end, strategy):
     end: str, end date
     """
     test = dataframe(ticker, start, end)
-    # percent return on ticker
-    i = test.data['Adj Close'].iloc[0]
-    f = test.data['Adj Close'].iloc[-1]
-    market_return = ((f - i) / i) * 100
     print(f"{strategy.__name__} Percent Return: {round(strategy(test),4)}%")
-    print(f"Market Percent Return: {round(market_return,4)}%")
+    print(f"Market Percent Return: {round(hold(test),4)}%")
     test.plot(strategy=strategy.__name__)
 
 

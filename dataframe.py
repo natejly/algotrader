@@ -83,6 +83,4 @@ class dataframe:
                      '^', markersize=5, color='green', label='Buy Signal')
             plt.plot(sell_signals, self.data.loc[sell_signals, 'Adj Close'],
                      'v', markersize=5, color='red', label='Sell Signal')
-
-        plt.legend()
         plt.show()

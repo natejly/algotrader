@@ -1,5 +1,22 @@
 # Runs dataframes through algorithms to generate trading signals
 
+
+def hold(df):
+    """
+    Buy and hold strategy (this one is my favorite)
+    "time in the market beats timing of the market"
+    -confucius probably
+    Inputs
+    df: dataframe object, data
+    Returns
+    percent_return: float, percent return of the strategy
+    """
+    i = df.data['Adj Close'].iloc[0]
+    f = df.data['Adj Close'].iloc[-1]
+    percent_return = ((f - i) / i) * 100
+    return percent_return
+
+
 def add_sma(df, window=20):
     """
     Add a simple moving average to the dataframe
