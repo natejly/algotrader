@@ -1,86 +1,174 @@
-# Description: Generates dataframe from yfinance and modifies it
 import yfinance as yf
-import matplotlib.pyplot as plt
 import pandas as pd
 import os
+from datetime import datetime, timedelta
 
 
-class dataframe:
-    # Class to generate and modify dataframes
-    def __init__(self, ticker, start, end, overwrite=False):
-        """
-        Get data from Yahoo Finance for a given ticker and date range
-        Inputs
-        ticker: str, ticker symbol
-        start: str, start date
-        end: str, end date
-        Returns
-        data: pd.DataFrame, data for the given ticker and date range
-        """
-        self.ticker = ticker
-        self.start = start
-        self.end = end
-        self.window = 20
-        self.file_path = f'data/{ticker}_{start}_{end}.csv'
+def download_data(ticker, start, end, overwrite=False):
+    """
+    Download or load data from Yahoo Finance for a given ticker and date range.
 
-        # make local data folder if it doesn't exist
-        if not os.path.exists('data'):
-            os.mkdir('data')
+    Inputs:
+    ticker: str, ticker symbol
+    start: str, start date
+    end: str, end date
+    overwrite: bool, if True, download the data even if a local copy exists
 
-        # Check if the data is already downloaded and handle overwrite logic
-        if os.path.exists(self.file_path) and not overwrite:
-            print('Data already exists')
-            self.data = pd.read_csv(self.file_path)
+    Returns:
+    data: pd.DataFrame, data for the given ticker and date range
+    """
+    file_path = f'data/{ticker}_{start}_{end}.csv'
+
+    # Make local data folder if it doesn't exist
+    if not os.path.exists('data'):
+        os.mkdir('data')
+
+    # Check if the data is already downloaded and handle overwrite logic
+    if os.path.exists(file_path) and not overwrite:
+        print('Data already exists')
+        data = pd.read_csv(file_path, index_col=0, parse_dates=True)
+    else:
+        print('Downloading data')
+        data = yf.download(ticker, start=start, interval='1d')
+        data.to_csv(file_path)
+        data.index = pd.to_datetime(data.index)
+
+    return data
+
+
+def add_live_price(data, ticker):
+    """
+    Add the live price to the DataFrame if it's not already included.
+
+    Inputs:
+    data: pd.DataFrame, data
+    ticker: str, ticker symbol
+
+    Returns:
+    data: pd.DataFrame, data with the live price added if it was missing
+    """
+    today_date = pd.Timestamp(datetime.today().date())
+
+    if today_date not in data.index:
+        print('Adding live price')
+        ticker_yf = yf.Ticker(ticker)
+        todays_data = ticker_yf.history(period='1d')
+
+        # Check if today's data is not empty
+        if not todays_data.empty:
+            data.loc[today_date] = todays_data.iloc[0]
         else:
-            print('Downloading data')
-            self.data = yf.download(ticker, start=start, end=end)
-            self.data.to_csv(self.file_path)
+            print("No data available for today.")
+    return data
 
-    def display(self):
-        """
-        Display the dataframe
 
-        Inputs
-        dataframe: pd.DataFrame, data
-        """
-        print(self.data)
+def add_bollinger_bands(df, window=20, num_std=2):
+    """
+    Add Bollinger Bands to the DataFrame.
 
-    def head(self):
-        """
-        Get the first 5  rows of the dataframe
+    Inputs:
+    df: DataFrame object, data
+    window: int, number of days to calculate the moving average
+    num_std: int, number of standard deviations to calculate the bands
+    """
+    add_sma(df, window)
+    sma_name = f'{window}d SMA'
+    df['Upper Band'] = df[sma_name] + num_std * \
+        df['Adj Close'].rolling(window=window).std()
+    df['Lower Band'] = df[sma_name] - num_std * \
+        df['Adj Close'].rolling(window=window).std()
 
-        Inputs
-        dataframe: pd.DataFrame, data
-        """
-        print(self.data.head())
 
-    def tail(self):
-        """
-        Get the last 5  rows of the dataframe
+def add_macd(df, short_window=12, long_window=26, signal_window=9):
+    """
+    Add MACD and Signal line to the DataFrame.
 
-        Inputs
-        dataframe: pd.DataFrame, data
-        """
-        print(self.data.tail())
+    Inputs:
+    df: DataFrame object, data
+    short_window: int, short period for the fast EMA
+    long_window: int, long period for the slow EMA
+    signal_window: int, period for the signal line EMA
+    """
+    df['EMA12'] = df['Adj Close'] \
+        .ewm(span=short_window, min_periods=short_window).mean()
+    df['EMA26'] = df['Adj Close'] \
+        .ewm(span=long_window, min_periods=long_window).mean()
+    df['MACD'] = df['EMA12'] - df['EMA26']
+    df['Signal Line'] = df['MACD'] \
+        .ewm(span=signal_window, min_periods=signal_window).mean()
 
-    def plot(self, strategy=None):
-        """
-        Plot the data
 
-        Inputs
-        dataframe: pd.DataFrame, data
-        """
-        plt.title('Adjusted Close Price of ' + self.ticker)
-        self.data['Adj Close'].plot()
-        if strategy == 'bbounds':
-            self.data['Upper Band'].plot(label='Upper Band', color='black')
-            self.data['Lower Band'].plot(label='Lower Band', color='black')
-            self.data[f'{self.window}d SMA'].plot(label=f'{self.window}d SMA',
-                                                  color='orange')
-            buy_signals = self.data[self.data[strategy] == 1].index
-            sell_signals = self.data[self.data[strategy] == -1].index
-            plt.plot(buy_signals, self.data.loc[buy_signals, 'Adj Close'],
-                     '^', markersize=5, color='green', label='Buy Signal')
-            plt.plot(sell_signals, self.data.loc[sell_signals, 'Adj Close'],
-                     'v', markersize=5, color='red', label='Sell Signal')
-        plt.show()
+def add_sma(df, window=20):
+    """
+    Add a simple moving average to the DataFrame.
+
+    Inputs:
+    df: DataFrame object, data
+    window: int, number of days to calculate the moving average
+    """
+    sma_name = f'{window}d SMA'
+    df[sma_name] = df['Adj Close'].rolling(window=window).mean()
+
+
+def display_data(data):
+    """
+    Display the entire DataFrame.
+
+    Inputs:
+    data: pd.DataFrame, data
+    """
+    print(data)
+
+
+def display_head(data):
+    """
+    Display the first 5 rows of the DataFrame.
+
+    Inputs:
+    data: pd.DataFrame, data
+    """
+    print(data.head())
+
+
+def display_tail(data):
+    """
+    Display the last 5 rows of the DataFrame.
+
+    Inputs:
+    data: pd.DataFrame, data
+    """
+    print(data.tail())
+
+
+def simulate_trades(df, signal_column):
+    """
+    Simulate trades based on the signal column.
+
+    Inputs:
+    df: DataFrame object, data
+    signal_column: str, column name with the trading signal
+    """
+    # to excecute the trade the next day
+    df['strategy'] = 0
+    df[signal_column].shift(1)
+    holding = False
+    money = 100
+    shares = 0
+    for i in range(0, len(df)):
+        if df[signal_column].iloc[i] == 1 and not holding:
+            shares = money / df['Adj Close'].iloc[i]
+            money = 0
+            holding = True
+
+        elif df[signal_column].iloc[i] == -1 and holding:
+            money = shares * df['Adj Close'].iloc[i]
+            shares = 0
+            holding = False
+        if holding:
+            df['strategy'].iloc[i] = df['Adj Close'].iloc[i] * shares
+        else:
+            df['strategy'].iloc[i] = money
+
+if __name__ == '__main__':
+    end = datetime.today().strftime('%Y-%m-%d')
+    data = download_data('AAPL', '2022-8-01', end)
