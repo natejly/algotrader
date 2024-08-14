@@ -3,6 +3,8 @@ import pandas as pd
 import os
 from datetime import datetime
 
+# TODO Rewrite this to accept multiple tickers
+
 
 def download_data(ticker, start, end, overwrite=False):
     """
@@ -108,16 +110,6 @@ def add_sma(df, window=20):
     """
     sma_name = f'{window}d SMA'
     df[sma_name] = df['Adj Close'].rolling(window=window).mean()
-
-
-def display_data(data):
-    """
-    Display the entire DataFrame.
-
-    Inputs:
-    data: pd.DataFrame, data
-    """
-    print(data)
 
 
 def display_head(data):

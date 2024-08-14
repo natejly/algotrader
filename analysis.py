@@ -14,7 +14,6 @@ def cagr(returns):
     """
     num_years = (returns.index[-1] - returns.index[0]).days / 365
     cagr_value = (returns.iloc[-1] / returns.iloc[0]) ** (1 / num_years) - 1
-
     return cagr_value * 100
 
 
