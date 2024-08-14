@@ -29,7 +29,7 @@ def download_data(ticker, start, end, overwrite=False):
         data = pd.read_csv(file_path, index_col=0, parse_dates=True)
     else:
         print('Downloading data')
-        data = yf.download(ticker, start=start, interval='1d')
+        data = yf.download(ticker, start, end, interval='1d')
         data.to_csv(file_path)
         data.index = pd.to_datetime(data.index)
 
@@ -152,7 +152,7 @@ def simulate_trades(df, signal_column):
     df['strategy'] = 0
     df[signal_column].shift(1)
     holding = False
-    money = 100
+    money = 1
     shares = 0
     for i in range(0, len(df)):
         if df[signal_column].iloc[i] == 1 and not holding:
@@ -168,3 +168,4 @@ def simulate_trades(df, signal_column):
             df['strategy'].iloc[i] = df['Adj Close'].iloc[i] * shares
         else:
             df['strategy'].iloc[i] = money
+    df['strategy returns'] = df['strategy'].pct_change()

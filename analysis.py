@@ -45,10 +45,9 @@ def sharpe_ratio(returns, risk_free_rate=0):
     float, Sharpe Ratio
     """
     # doesn't work
-    mean = returns.mean()
-    std = returns.std(ddof=1)
-    sharpe_ratio = np.sqrt(len(returns)) * mean / std
-    return sharpe_ratio
+    mean = returns.mean() * 252 - risk_free_rate
+    sigma = returns.std(ddof=1) * np.sqrt(252)
+    return mean / sigma
 
 
 def calmar_ratio(returns):
