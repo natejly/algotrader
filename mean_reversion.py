@@ -16,3 +16,4 @@ def bollinger_bands(df, window=20, num_std=2):
     df['Signal'] = 0
     df.loc[df['Adj Close'] <= df['Lower Band'], 'Signal'] = 1
     df.loc[df['Adj Close'] >= df['Upper Band'], 'Signal'] = -1
+    

@@ -1,4 +1,5 @@
 # functions for analysis of the trading strategies
+import numpy as np
 
 
 def cagr(returns):
@@ -11,7 +12,7 @@ def cagr(returns):
     Returns:
     float, CAGR
     """
-    num_years = (returns.index[-1] - returns.index[0]).days / 365.25
+    num_years = (returns.index[-1] - returns.index[0]).days / 365
     cagr_value = (returns.iloc[-1] / returns.iloc[0]) ** (1 / num_years) - 1
 
     return cagr_value * 100
@@ -34,16 +35,20 @@ def kelly(win_prob, win_size, loss_size):
 
 def sharpe_ratio(returns, risk_free_rate=0):
     """
-    Function to calculate the Sharpe ratio
+    Function to calculate the Sharpe Ratio
 
     Inputs:
-    returns: pd.Series, daily returns
-    risk_free_rate: float, risk-free rate
+    returns: pd.Series, daily returns of the investment
+    risk_free_rate: float, the risk-free rate (annualized)
 
     Returns:
-    float, Sharpe ratio
+    float, Sharpe Ratio
     """
-    return (returns.mean() - risk_free_rate) / returns.std()
+    # doesn't work
+    mean = returns.mean()
+    std = returns.std(ddof=1)
+    sharpe_ratio = np.sqrt(len(returns)) * mean / std
+    return sharpe_ratio
 
 
 def calmar_ratio(returns):

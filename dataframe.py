@@ -1,7 +1,7 @@
 import yfinance as yf
 import pandas as pd
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 def download_data(ticker, start, end, overwrite=False):
@@ -168,7 +168,3 @@ def simulate_trades(df, signal_column):
             df['strategy'].iloc[i] = df['Adj Close'].iloc[i] * shares
         else:
             df['strategy'].iloc[i] = money
-
-if __name__ == '__main__':
-    end = datetime.today().strftime('%Y-%m-%d')
-    data = download_data('AAPL', '2022-8-01', end)
