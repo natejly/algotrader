@@ -6,6 +6,7 @@ from statsmodels.tsa.stattools import adfuller
 import os
 import numpy as np
 
+
 def download_prices(tickers, start, end):
     """
     Download historical prices for a list of tickers.
@@ -73,7 +74,6 @@ def get_spread1(ticker1, ticker2, data, plot=False):
 
 
 def get_spread2(ticker1, ticker2, data, plot=False):
-    """    https://www.quantifiedstrategies.com/pairs-trading-strategy-python/"""
     Y = np.log(data[ticker1])
     X = np.log(data[ticker2])
     X = sm.add_constant(X)  # Adds a constant column to X
@@ -90,10 +90,10 @@ def get_spread2(ticker1, ticker2, data, plot=False):
     return spread
 
 
-def get_zscore(spread, window=100):
-    rolling_mean = spread.rolling(window).mean()
-    rolling_std = spread.rolling(window).std()
-    zscore = (spread - rolling_mean) / rolling_std
+def get_zscore(spread):
+    mean = np.mean(spread)
+    std = np.std(spread)
+    zscore = (spread - mean) / std
     return zscore
 
 
@@ -172,4 +172,7 @@ if __name__ == '__main__':
     valid_pairs, xtra_valid_pairs = check_pairs(data)
     print(f"Valid pairs: {valid_pairs}")
     print(f"Xtra Valid pairs: {xtra_valid_pairs}")
-
+    spread = get_spread2('BAC', 'JPM', data)
+    zscore = get_zscore(spread)
+    zscore.plot()
+    plt.show()
