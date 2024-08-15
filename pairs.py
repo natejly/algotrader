@@ -4,7 +4,7 @@ import statsmodels.api as sm
 import matplotlib.pyplot as plt
 from statsmodels.tsa.stattools import adfuller
 import os
-
+import numpy as np
 
 def download_prices(tickers, start, end):
     """
@@ -38,10 +38,10 @@ def download_prices(tickers, start, end):
 
         data.to_csv(file_path)
 
-    return data.fillna(0)
+    return data.fillna(0.00001)
 
 
-def get_synthetic_spread(ticker1, ticker2, data, plot=False):
+def get_spread1(ticker1, ticker2, data, plot=False):
     """
     Calculate the spread between two tickers using OLS regression.
 
@@ -59,6 +59,7 @@ def get_synthetic_spread(ticker1, ticker2, data, plot=False):
     train['ticker2'] = data[ticker2]
     model = sm.OLS(train.ticker1, train.ticker2).fit()
     hedge_ratio = model.params.iloc[0]
+    # hedge_ratio = 1
     spread = data[ticker1] - hedge_ratio * data[ticker2]
 
     if plot:
@@ -67,6 +68,24 @@ def get_synthetic_spread(ticker1, ticker2, data, plot=False):
         plt.axhline(spread.mean(), color='red', linestyle='--', label='Mean')
         plt.legend()
         plt.show()
+
+    return spread
+
+
+def get_spread2(ticker1, ticker2, data, plot=False):
+    """    https://www.quantifiedstrategies.com/pairs-trading-strategy-python/"""
+    Y = np.log(data[ticker1])
+    X = np.log(data[ticker2])
+    X = sm.add_constant(X)  # Adds a constant column to X
+
+    # Fit the OLS model
+    model = sm.OLS(Y, X)
+    results = model.fit()
+    results.params
+    # Extract beta and alpha from the model parameters
+    alpha = results.params.iloc[0]
+    beta = results.params.iloc[1]
+    spread = Y - beta * X.iloc[:, 1] - alpha
 
     return spread
 
@@ -130,7 +149,7 @@ def check_pairs(data, print_result=False, plot=False):
     extra_valid_pairs = []
     for i in range(len(tickers)):
         for j in range(i + 1, len(tickers)):
-            spread = get_synthetic_spread(tickers[i], tickers[j], data)
+            spread = get_spread2(tickers[i], tickers[j], data)
             adf = run_adf(spread, print_result=print_result, plot=plot)
             p_value = adf[1]
 
@@ -144,21 +163,13 @@ def check_pairs(data, print_result=False, plot=False):
     return valid_pairs, extra_valid_pairs
 
 
-def generate_signals(z_score, entry_threshold=2.0, exit_threshold=0.5):
-    signals = pd.Series(index=z_score.index)
-    signals[z_score > entry_threshold] = -1  # Short spread
-    signals[z_score < -entry_threshold] = 1  # Long spread
-    signals[(z_score < exit_threshold) & (z_score > -exit_threshold)] = 0 
-    print(signals)
-    return signals
-
-
 if __name__ == '__main__':
     tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'BLNK', 'TSLA',
-               'SPY', 'NIO', 'GOOG', 'BRK-B', 'SPY']
-    start = '2018-12-01'
-    end = '2022-03-31'
+               'SPY', 'NIO', 'GOOG', 'BRK-B', 'BAC', 'JPM']
+    start = '2015-01-01'
+    end = '2023-01-01'
     data = download_prices(tickers, start, end)
     valid_pairs, xtra_valid_pairs = check_pairs(data)
     print(f"Valid pairs: {valid_pairs}")
     print(f"Xtra Valid pairs: {xtra_valid_pairs}")
+
