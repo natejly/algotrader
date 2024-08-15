@@ -105,26 +105,23 @@ def run_adf(spread, print_result=False, plot=False):
     return adf_result
 
 
-def check_pairs(tickers, start, end):
+def check_pairs(data, print_result=False, plot=False):
     """
     Check for cointegration between pairs of tickers.
 
     Inputs:
-    tickers: list of str, ticker symbols
-    start: str, start date
-    end: str, end date
+    data: pd.DataFrame, historical prices for the tickers
 
     Returns:
     valid_pairs: list of tuples, pairs of tickers that are cointegrated
     extra_valid_pairs: list of tuples, where t-stat < 1% critical value
     """
-    data = download_prices(tickers, start, end)
     valid_pairs = []
     extra_valid_pairs = []
     for i in range(len(tickers)):
         for j in range(i + 1, len(tickers)):
             spread = get_spread(tickers[i], tickers[j], data)
-            adf = run_adf(spread, print_result=True, plot=False)
+            adf = run_adf(spread, print_result=print_result, plot=plot)
             p_value = adf[1]
 
             if p_value < 0.05:
@@ -142,6 +139,7 @@ if __name__ == '__main__':
                'SPY', 'NIO', 'GOOG']
     start = '2023-01-01'
     end = '2024-01-01'
-    valid_pairs = check_pairs(tickers, start, end)
-    print(f"Valid pairs: {valid_pairs[0]}")
-    print(f"Xtra Valid pairs: {valid_pairs[1]}")
+    data = download_prices(tickers, start, end)
+    valid_pairs, xtra_valid_pairs = check_pairs(data)
+    print(f"Valid pairs: {valid_pairs}")
+    print(f"Xtra Valid pairs: {valid_pairs}")
