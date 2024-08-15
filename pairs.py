@@ -41,7 +41,7 @@ def download_prices(tickers, start, end):
     return data.fillna(0)
 
 
-def get_spread(ticker1, ticker2, data, plot=False):
+def get_synthetic_spread(ticker1, ticker2, data, plot=False):
     """
     Calculate the spread between two tickers using OLS regression.
 
@@ -54,8 +54,11 @@ def get_spread(ticker1, ticker2, data, plot=False):
     Returns:
     spread: pd.Series, the spread between the two tickers
     """
-    model = sm.OLS(data[ticker1], sm.add_constant(data[ticker2])).fit()
-    hedge_ratio = model.params[ticker2]
+    train = pd.DataFrame()
+    train['ticker1'] = data[ticker1]
+    train['ticker2'] = data[ticker2]
+    model = sm.OLS(train.ticker1, train.ticker2).fit()
+    hedge_ratio = model.params.iloc[0]
     spread = data[ticker1] - hedge_ratio * data[ticker2]
 
     if plot:
@@ -66,6 +69,13 @@ def get_spread(ticker1, ticker2, data, plot=False):
         plt.show()
 
     return spread
+
+
+def get_zscore(spread, window=100):
+    rolling_mean = spread.rolling(window).mean()
+    rolling_std = spread.rolling(window).std()
+    zscore = (spread - rolling_mean) / rolling_std
+    return zscore
 
 
 def run_adf(spread, print_result=False, plot=False):
@@ -120,7 +130,7 @@ def check_pairs(data, print_result=False, plot=False):
     extra_valid_pairs = []
     for i in range(len(tickers)):
         for j in range(i + 1, len(tickers)):
-            spread = get_spread(tickers[i], tickers[j], data)
+            spread = get_synthetic_spread(tickers[i], tickers[j], data)
             adf = run_adf(spread, print_result=print_result, plot=plot)
             p_value = adf[1]
 
@@ -134,12 +144,21 @@ def check_pairs(data, print_result=False, plot=False):
     return valid_pairs, extra_valid_pairs
 
 
+def generate_signals(z_score, entry_threshold=2.0, exit_threshold=0.5):
+    signals = pd.Series(index=z_score.index)
+    signals[z_score > entry_threshold] = -1  # Short spread
+    signals[z_score < -entry_threshold] = 1  # Long spread
+    signals[(z_score < exit_threshold) & (z_score > -exit_threshold)] = 0 
+    print(signals)
+    return signals
+
+
 if __name__ == '__main__':
     tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'BLNK', 'TSLA',
-               'SPY', 'NIO', 'GOOG']
-    start = '2023-01-01'
-    end = '2024-01-01'
+               'SPY', 'NIO', 'GOOG', 'BRK-B', 'SPY']
+    start = '2018-12-01'
+    end = '2022-03-31'
     data = download_prices(tickers, start, end)
     valid_pairs, xtra_valid_pairs = check_pairs(data)
     print(f"Valid pairs: {valid_pairs}")
-    print(f"Xtra Valid pairs: {valid_pairs}")
+    print(f"Xtra Valid pairs: {xtra_valid_pairs}")
