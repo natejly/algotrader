@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from statsmodels.tsa.stattools import adfuller
 import os
 import numpy as np
+from analysis import cagr, sharpe_ratio
 
 #implement dynamic rolling window
 #implement stop loss and take profit
@@ -195,38 +196,57 @@ def add_signals(data, valid_pairs, window=250):
                 # if zscore is between -1 and 1, do nothing
                 if -1 <= zscore.iloc[-1] <= 1:
                     data.loc[data.index[i], colname] = 0
+        
 
 
-
-
-def backtest(data, valid_pairs, window=250):
+def backtest(data, valid_pairs, window=250, stop_loss=None, take_profit=None):
+    portfolio = pd.DataFrame(index=data.index)
+    
     for pair in valid_pairs:
         ticker1, ticker2 = pair
         colname = f"{ticker1}_{ticker2}"
         data[colname].shift(1)
-        holding = False
-        money = 1
-        shares = 0
-        # for ticker2
+        
+        holding1 = False
         holding2 = False
+        money1 = 1
         money2 = 1
+        shares1 = 0
         shares2 = 0
+        
         for i in range(window, len(data)):
-            if data.loc[data.index[i], colname] == 1 and not holding:
-                shares = money / data[ticker1].iloc[i]
-                money = 0
-                holding = True
-            elif data.loc[data.index[i], colname] == -1 and holding:
-                money = shares * data[ticker1].iloc[i]
-                shares = 0
-                holding = False
+            # Handle ticker1 trading logic
+            if data.loc[data.index[i], colname] == 1 and not holding1:
+                shares1 = money1 / data[ticker1].iloc[i]
+                money1 = 0
+                holding1 = True
+            elif data.loc[data.index[i], colname] == -1 and holding1:
+                money1 = shares1 * data[ticker1].iloc[i]
+                shares1 = 0
+                holding1 = False
 
-            if holding:
-                data.loc[data.index[i], f'{colname}_returns1'] = data[ticker1].iloc[i] * shares
+            # Stop loss and take profit logic for ticker1
+            if holding1:
+                entry_price1 = data[ticker1].iloc[i]  # Record the entry price
+                if stop_loss and data[ticker1].iloc[i] <= \
+                        (1 - stop_loss) * entry_price1:
+                    money1 = shares1 * data[ticker1].iloc[i]
+                    shares1 = 0
+                    holding1 = False
+                elif take_profit and data[ticker1].iloc[i] >= \
+                        (1 + take_profit) * entry_price1:
+                    money1 = shares1 * data[ticker1].iloc[i]
+                    shares1 = 0
+                    holding1 = False
+
+            # Record the returns for ticker1
+            if holding1:
+                data.loc[data.index[i], f'{colname}_returns1'] = \
+                        shares1 * data[ticker1].iloc[i]
             else:
-                data.loc[data.index[i], f'{colname}_returns1'] = money
+                data.loc[data.index[i], f'{colname}_returns1'] = money1
 
-            # for ticker 2 which is the reverse of ticker 1
+            # Handle ticker2 trading logic (implementing the shorting logic)
             if data.loc[data.index[i], colname] == -1 and not holding2:
                 shares2 = money2 / data[ticker2].iloc[i]
                 money2 = 0
@@ -235,32 +255,56 @@ def backtest(data, valid_pairs, window=250):
                 money2 = shares2 * data[ticker2].iloc[i]
                 shares2 = 0
                 holding2 = False
-                
+
+            # Stop loss and take profit logic for ticker2
             if holding2:
-                data.loc[data.index[i], f'{colname}_returns2'] = data[ticker2].iloc[i] * shares2
+                entry_price2 = data[ticker2].iloc[i]  # Record the entry price
+                if stop_loss and data[ticker2].iloc[i] <= \
+                        (1 - stop_loss) * entry_price2:
+                    money2 = shares2 * data[ticker2].iloc[i]
+                    shares2 = 0
+                    holding2 = False
+                elif take_profit and data[ticker2].iloc[i] >= \
+                        (1 + take_profit) * entry_price2:
+                    money2 = shares2 * data[ticker2].iloc[i]
+                    shares2 = 0
+                    holding2 = False
+
+            # Record the returns for ticker2
+            if holding2:
+                data.loc[data.index[i], f'{colname}_returns2'] = \
+                    shares2 * data[ticker2].iloc[i]
             else:
                 data.loc[data.index[i], f'{colname}_returns2'] = money2
-                
-        data[f'{colname}_returns'] = (data[f'{colname}_returns1'] + data[f'{colname}_returns2']) / 2
 
-        # plot returns
-        data[f'{colname}_returns1'].plot(label=f'{ticker1} returns')
-        data[f'{colname}_returns2'].plot(label=f'{ticker2} returns')
-        data[f'{colname}_returns'].plot(label='Total returns')
-        plt.legend()
-        plt.show()
-                
-                
+        # Calculate the combined returns for the pair
+        data[f'{colname}_returns'] = (data[f'{colname}_returns1'] + 
+                                      data[f'{colname}_returns2']) / 2
+
+        # Accumulate results in the portfolio DataFrame
+
+        portfolio[colname] = data[f'{colname}_returns']
+
+    # Aggregate total portfolio returns
+    portfolio['Combined Return'] = portfolio.mean(axis=1)
+
+    return portfolio
+
+
 if __name__ == '__main__':
-    tickers = ['BRK-A','BRK-B']
-    start = '2010-01-01'
-    end = '2020-01-01'
-
+    tickers = ['NIO', 'BLNK', 'TSLA', 'AAPL', 'MSFT', 'GOOGL', 
+               'AMZN', 'AMD', 'NVDA']
+    start = '2014-01-01'
+    end = '2024-01-01'
     data = download_prices(tickers, start, end)
     valid_pairs = check_pairs(data)
-
-    # pretend amd and nvda are a valid pair
     print(f"Valid pairs: {valid_pairs}")
     add_signals(data, valid_pairs)
-    backtest(data, valid_pairs)
-    print(data)
+    portfolio = backtest(data, valid_pairs)
+    print(portfolio)
+    portfolio['Combined Return'].plot()
+    plt.show()
+    # get CAGR and Sharpe ratio
+    print(f"CAGR: {cagr(portfolio['Combined Return'])}")
+    print(f"Sharpe Ratio: {sharpe_ratio(portfolio['Combined Return'])}")
+    
