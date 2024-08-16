@@ -253,7 +253,7 @@ def backtest(data, valid_pairs, window=250):
         data[f'{colname}_returns'].plot(label='Total returns')
         portfolio[f'{colname}_returns'] = data[f'{colname}_returns']
         portfolio.dropna(inplace=True)
-        portfolio['Combined Return'] = portfolio.sum(axis=1)/len(valid_pairs)
+        portfolio['Combined Return'] = portfolio.sum(axis=1)
         portfolio['Percent Change'] = portfolio['Combined Return'].pct_change()
 
         plt.legend()
@@ -262,7 +262,8 @@ def backtest(data, valid_pairs, window=250):
 
 
 if __name__ == '__main__':
-    tickers = ['BRK-A', 'BRK-B', 'GOOG', 'GOOGL', 'SPY']
+    tickers = ['BRK-A', 'BRK-B', 'GOOG', 'GOOGL', 'SPY', 'AAPL', 'MSFT',
+               'AMZN', 'TSLA', 'NFLX', 'BA', 'DIS', 'JPM', 'GS', 'C', 'WFC',]
     start = '2020-01-01'
     end = '2024-01-01'
     data = download_prices(tickers, start, end)
