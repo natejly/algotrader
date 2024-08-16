@@ -6,7 +6,8 @@ from statsmodels.tsa.stattools import adfuller
 import os
 import numpy as np
 
-
+#implement dynamic rolling window
+#implement stop loss and take profit
 def download_prices(tickers, start, end):
     """
     Download historical prices for a list of tickers.
@@ -38,13 +39,23 @@ def download_prices(tickers, start, end):
             data[ticker] = ticker_data['Adj Close']
 
         data.to_csv(file_path)
+    return data
 
-    return data.fillna(0.00001)
 
+def run_ols(data, ticker1, ticker2):
 
-def get_spread1(ticker1, ticker2, data, plot=False):
+    Y = np.log(data[ticker1])
+    X = np.log(data[ticker2])
+    X = sm.add_constant(X)  # Adds a constant column to X
+
+    # Fit the OLS model
+    model = sm.OLS(Y, X)
+    results = model.fit()
+    return results
+
+def get_spread(ticker1, ticker2, data, plot=False):
     """
-    Calculate the spread between two tickers using OLS regression.
+    Calculate the spread between two tickers using OLS regression on log-transformed prices.
 
     Inputs:
     ticker1: str, ticker symbol
@@ -55,14 +66,21 @@ def get_spread1(ticker1, ticker2, data, plot=False):
     Returns:
     spread: pd.Series, the spread between the two tickers
     """
-    train = pd.DataFrame()
-    train['ticker1'] = data[ticker1]
-    train['ticker2'] = data[ticker2]
-    model = sm.OLS(train.ticker1, train.ticker2).fit()
-    hedge_ratio = model.params.iloc[0]
-    # hedge_ratio = 1
-    spread = data[ticker1] - hedge_ratio * data[ticker2]
+    # Run OLS regression
+    results = run_ols(data, ticker1, ticker2)
 
+    # Log-transform prices
+    Y = np.log(data[ticker1])
+    X = np.log(data[ticker2])
+
+    # Extract beta and alpha from the OLS model parameters
+    alpha = results.params.iloc[0]  # Intercept
+    beta = results.params.iloc[1]   # Slope
+
+    # Calculate the spread
+    spread = Y - beta * X - alpha
+
+    # Plot the spread if requested
     if plot:
         plt.figure(figsize=(10, 5))
         plt.plot(spread, label=f'Spread: {ticker1} - {ticker2}')
@@ -73,25 +91,16 @@ def get_spread1(ticker1, ticker2, data, plot=False):
     return spread
 
 
-def get_spread2(ticker1, ticker2, data, plot=False):
-    Y = np.log(data[ticker1])
-    X = np.log(data[ticker2])
-    X = sm.add_constant(X)  # Adds a constant column to X
-
-    # Fit the OLS model
-    model = sm.OLS(Y, X)
-    results = model.fit()
-    results.params
-    # Extract beta and alpha from the model parameters
-    alpha = results.params.iloc[0]
-    beta = results.params.iloc[1]
-    spread = Y - beta * X.iloc[:, 1] - alpha
-
-    return spread
-
-
 def get_zscore(spread):
-    
+    """
+    Calculate the z-score of the spread.
+
+    Inputs:
+    spread: pd.Series, the spread between two tickers
+
+    Returns:
+    zscore: pd.Series, the z-score of the spread
+    """
     mean = np.mean(spread)
     std = np.std(spread)
     zscore = (spread - mean) / std
@@ -108,7 +117,7 @@ def run_adf(spread, print_result=False, plot=False):
     plot: bool, if True, plot the spread
 
     Returns:
-    adf_result: tuple, ADF test results
+    if the spread is stationary
     """
     if plot:
         plt.figure(figsize=(10, 5))
@@ -131,65 +140,127 @@ def run_adf(spread, print_result=False, plot=False):
             print('Reject the null hypothesis at the 5% level (Stationary)')
         else:
             print('Failed to reject the null hypothesis (Non-Stationary)')
+    if adf_result[0] < adf_result[4]['5%']:
+        return True
 
-    return adf_result
+    return False
 
 
-def check_pairs(data, print_result=False, plot=False):
+def check_pairs(data, window=250, print_result=False, plot=False):
     """
     Check for cointegration between pairs of tickers.
 
     Inputs:
     data: pd.DataFrame, historical prices for the tickers
+    train_factor: float, percent of data to use as initial coint check
 
     Returns:
     valid_pairs: list of tuples, pairs of tickers that are cointegrated
-    extra_valid_pairs: list of tuples, where t-stat < 1% critical value
     """
+    data = data.head(window)
+    print(data.tail())
     valid_pairs = []
-    extra_valid_pairs = []
     tickers = data.columns
     for i in range(len(tickers)):
         for j in range(i + 1, len(tickers)):
-            spread = get_spread2(tickers[i], tickers[j], data)
-            adf = run_adf(spread, print_result=print_result, plot=plot)
-            p_value = adf[1]
-
-            if p_value < 0.05:
+            spread = get_spread(tickers[i], tickers[j], data)
+            coint = run_adf(spread, print_result=print_result, plot=plot)
+            if coint:
                 valid_pairs.append((tickers[i], tickers[j]))
-
-            if adf[0] < adf[4]['1%']:
-                extra_valid_pairs.append((tickers[i], tickers[j]))
-                # valid_pairs.remove((tickers[i], tickers[j]))
-
-    return valid_pairs, extra_valid_pairs
+    return valid_pairs
 
 
-def add_signals(data, valid_pairs):
+def add_signals(data, valid_pairs, window=250):
+    #testing for a single pair for now
     for pair in valid_pairs:
-        print(pair)
-        spread = get_spread2(pair[0], pair[1], data)
-        zscore = get_zscore(spread)
-        data[f'zscore {pair[0]}_{pair[1]}'] = zscore
-        data[f'{pair[0]}_{pair[1]}_signal'] = 0
-        data[f'{pair[0]}_{pair[1]}_signal'].loc[zscore > 1] = -1
-        data[f'{pair[0]}_{pair[1]}_signal'].loc[zscore < -1] = 1
-        zscore.plot()
-        plt.title(f'zscore {pair[0]}_{pair[1]}')
-        plt.axhline(1, color='red', linestyle='--')
-        plt.axhline(-1, color='red', linestyle='--')
+        ticker1, ticker2 = pair
+        colname = f"{ticker1}_{ticker2}"
+        data[colname] = np.nan
+        data[f'{colname}_zscore'] = np.nan
+        # start our sliding window ending i
+        # if window is coint then can generate signals for i+1
+        for i in range(window, len(data)):
+            win_data = data.iloc[i-window:i]
+            spread = get_spread(ticker1, ticker2, win_data)
+            #check if spread is cointegrated
+            if run_adf(spread):
+                zscore = get_zscore(spread)
+                data.loc[data.index[i], f'{colname}_zscore'] = zscore.iloc[-1]
+                # if zscore is greater than 1, buy ticker1 and sell ticker2
+                if zscore.iloc[-1] > 1:
+                    data.loc[data.index[i], colname] = -1
+                # if zscore is less than -1, sell ticker1 and buy ticker2
+                if zscore.iloc[-1] < -1:
+                    data.loc[data.index[i], colname] = 1
+                # if zscore is between -1 and 1, do nothing
+                if -1 <= zscore.iloc[-1] <= 1:
+                    data.loc[data.index[i], colname] = 0
+
+
+
+
+def backtest(data, valid_pairs, window=250):
+    for pair in valid_pairs:
+        ticker1, ticker2 = pair
+        colname = f"{ticker1}_{ticker2}"
+        data[colname].shift(1)
+        holding = False
+        money = 1
+        shares = 0
+        # for ticker2
+        holding2 = False
+        money2 = 1
+        shares2 = 0
+        for i in range(window, len(data)):
+            if data.loc[data.index[i], colname] == 1 and not holding:
+                shares = money / data[ticker1].iloc[i]
+                money = 0
+                holding = True
+            elif data.loc[data.index[i], colname] == -1 and holding:
+                money = shares * data[ticker1].iloc[i]
+                shares = 0
+                holding = False
+
+            if holding:
+                data.loc[data.index[i], f'{colname}_returns1'] = data[ticker1].iloc[i] * shares
+            else:
+                data.loc[data.index[i], f'{colname}_returns1'] = money
+
+            # for ticker 2 which is the reverse of ticker 1
+            if data.loc[data.index[i], colname] == -1 and not holding2:
+                shares2 = money2 / data[ticker2].iloc[i]
+                money2 = 0
+                holding2 = True
+            elif data.loc[data.index[i], colname] == 1 and holding2:
+                money2 = shares2 * data[ticker2].iloc[i]
+                shares2 = 0
+                holding2 = False
+                
+            if holding2:
+                data.loc[data.index[i], f'{colname}_returns2'] = data[ticker2].iloc[i] * shares2
+            else:
+                data.loc[data.index[i], f'{colname}_returns2'] = money2
+                
+        data[f'{colname}_returns'] = (data[f'{colname}_returns1'] + data[f'{colname}_returns2']) / 2
+
+        # plot returns
+        data[f'{colname}_returns1'].plot(label=f'{ticker1} returns')
+        data[f'{colname}_returns2'].plot(label=f'{ticker2} returns')
+        data[f'{colname}_returns'].plot(label='Total returns')
+        plt.legend()
         plt.show()
-
-
+                
+                
 if __name__ == '__main__':
-    # tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'BLNK', 'TSLA',
-    #            'SPY', 'NIO', 'GOOG', 'BRK-B', 'BAC', 'JPM']
-    # start = '2015-01-01'
-    # end = '2023-01-01'
-    # data = download_prices(tickers, start, end)
-    # valid_pairs, xtra_valid_pairs = check_pairs(data)
-    # print(f"Valid pairs: {valid_pairs}")
-    # print(f"Xtra Valid pairs: {xtra_valid_pairs}")
-    valid_pairs = [('BAC', 'JPM')]
-    data = download_prices(['BAC', 'JPM'], '2015-01-01', '2023-01-01')
+    tickers = ['BRK-A','BRK-B']
+    start = '2010-01-01'
+    end = '2020-01-01'
+
+    data = download_prices(tickers, start, end)
+    valid_pairs = check_pairs(data)
+
+    # pretend amd and nvda are a valid pair
+    print(f"Valid pairs: {valid_pairs}")
     add_signals(data, valid_pairs)
+    backtest(data, valid_pairs)
+    print(data)
