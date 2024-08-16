@@ -91,6 +91,7 @@ def get_spread2(ticker1, ticker2, data, plot=False):
 
 
 def get_zscore(spread):
+    
     mean = np.mean(spread)
     std = np.std(spread)
     zscore = (spread - mean) / std
@@ -147,6 +148,7 @@ def check_pairs(data, print_result=False, plot=False):
     """
     valid_pairs = []
     extra_valid_pairs = []
+    tickers = data.columns
     for i in range(len(tickers)):
         for j in range(i + 1, len(tickers)):
             spread = get_spread2(tickers[i], tickers[j], data)
@@ -158,21 +160,36 @@ def check_pairs(data, print_result=False, plot=False):
 
             if adf[0] < adf[4]['1%']:
                 extra_valid_pairs.append((tickers[i], tickers[j]))
-                valid_pairs.remove((tickers[i], tickers[j]))
+                # valid_pairs.remove((tickers[i], tickers[j]))
 
     return valid_pairs, extra_valid_pairs
 
 
+def add_signals(data, valid_pairs):
+    for pair in valid_pairs:
+        print(pair)
+        spread = get_spread2(pair[0], pair[1], data)
+        zscore = get_zscore(spread)
+        data[f'zscore {pair[0]}_{pair[1]}'] = zscore
+        data[f'{pair[0]}_{pair[1]}_signal'] = 0
+        data[f'{pair[0]}_{pair[1]}_signal'].loc[zscore > 1] = -1
+        data[f'{pair[0]}_{pair[1]}_signal'].loc[zscore < -1] = 1
+        zscore.plot()
+        plt.title(f'zscore {pair[0]}_{pair[1]}')
+        plt.axhline(1, color='red', linestyle='--')
+        plt.axhline(-1, color='red', linestyle='--')
+        plt.show()
+
+
 if __name__ == '__main__':
-    tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'BLNK', 'TSLA',
-               'SPY', 'NIO', 'GOOG', 'BRK-B', 'BAC', 'JPM']
-    start = '2015-01-01'
-    end = '2023-01-01'
-    data = download_prices(tickers, start, end)
-    valid_pairs, xtra_valid_pairs = check_pairs(data)
-    print(f"Valid pairs: {valid_pairs}")
-    print(f"Xtra Valid pairs: {xtra_valid_pairs}")
-    spread = get_spread2('BAC', 'JPM', data)
-    zscore = get_zscore(spread)
-    zscore.plot()
-    plt.show()
+    # tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'BLNK', 'TSLA',
+    #            'SPY', 'NIO', 'GOOG', 'BRK-B', 'BAC', 'JPM']
+    # start = '2015-01-01'
+    # end = '2023-01-01'
+    # data = download_prices(tickers, start, end)
+    # valid_pairs, xtra_valid_pairs = check_pairs(data)
+    # print(f"Valid pairs: {valid_pairs}")
+    # print(f"Xtra Valid pairs: {xtra_valid_pairs}")
+    valid_pairs = [('BAC', 'JPM')]
+    data = download_prices(['BAC', 'JPM'], '2015-01-01', '2023-01-01')
+    add_signals(data, valid_pairs)
