@@ -352,11 +352,11 @@ def main():
     plt.xlabel('Date')
     plt.ylabel('Returns')
     plt.grid()
-    plt.show()
     # # get CAGR and Sharpe ratio
     print(f"Strategy Return: {portfolio['Combined Return'].iloc[-1]}")
     print(f"CAGR: {cagr(portfolio['Combined Return'])}")
     print(f"Sharpe Ratio: {sharpe_ratio(portfolio['Percent Change'])}")
+    plt.show()
 
 
 if __name__ == '__main__':
