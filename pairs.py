@@ -336,10 +336,13 @@ def main():
                'MSFT', 'TSLA', 'NVDA', 'AMD', 'SPY', 'QQQ']
     # 5 years of data from today for 20/80 train/test split
     # Note: accidentally started at 2018 once and almost fried my computer
-    # so be careful but also got a sharpe of 1.5
-    start = '2019-08-01'
-    end = '2024-08-01'
+    # so be careful but also got a sharpe of 1.5 w/ 30 cagr
+    start = '2019-8-16'
+    end = '2024-08-16'
     data = download_prices(tickers, start, end)
+    # high risk of overfiltering
+    # could run all pairs but thats a lot of computing
+    # so we will keep to cointegrated pairs in the training data
     valid_pairs = check_pairs(data)
     print(f"Valid pairs: {valid_pairs}")
     add_signals(data, valid_pairs)
@@ -352,7 +355,7 @@ def main():
     plt.xlabel('Date')
     plt.ylabel('Returns')
     plt.grid()
-    # # get CAGR and Sharpe ratio
+    # put drawdown and other stuff here
     print(f"Strategy Return: {portfolio['Combined Return'].iloc[-1]}")
     print(f"CAGR: {cagr(portfolio['Combined Return'])}")
     print(f"Sharpe Ratio: {sharpe_ratio(portfolio['Percent Change'])}")
