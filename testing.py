@@ -140,6 +140,21 @@ def display_tail(data):
     print(data.tail())
 
 
+def add_signals(df, window=20, num_std=2):
+    """
+    Simple Bollinger Bands trading strategy for testing
+
+    Inputs:
+    df: DataFrame object, data
+
+    """
+    add_bollinger_bands(df, window, num_std)
+
+    df['Signal'] = 0
+    df.loc[df['Adj Close'] <= df['Lower Band'], 'Signal'] = 1
+    df.loc[df['Adj Close'] >= df['Upper Band'], 'Signal'] = -1
+
+
 def simulate_trades(df, signal_column):
     """
     Simulate trades based on the signal column.
@@ -168,29 +183,18 @@ def simulate_trades(df, signal_column):
             df['strategy'].iloc[i] = df['Adj Close'].iloc[i] * shares
         else:
             df['strategy'].iloc[i] = money
-    df['strategy returns'] = df['strategy'].pct_change()
+    df['strategy pct change'] = df['strategy'].pct_change()
 
 
-def add_signals(df, window=20, num_std=2):
-    """
-    Simple Bollinger Bands trading strategy for testing
-
-    Inputs:
-    df: DataFrame object, data
-
-    """
-    add_bollinger_bands(df, window, num_std)
-
-    df['Signal'] = 0
-    df.loc[df['Adj Close'] <= df['Lower Band'], 'Signal'] = 1
-    df.loc[df['Adj Close'] >= df['Upper Band'], 'Signal'] = -1
-
-
-if __name__ == '__main__':
-    data = yf.download('SPY', '2023-08-14', '2024-08-14')
+def main():
+    data = download_data('SPY', '2023-08-14', '2024-08-14')
     add_signals(data, 20, 2)
     simulate_trades(data, 'Signal')
     print(data)
 
     print(f"CAGR: {cagr(data['strategy'])}")
-    print(f"Sharpe: {sharpe_ratio(data['strategy returns'])}")
+    print(f"Sharpe: {sharpe_ratio(data['strategy pct change'])}")
+
+
+if __name__ == '__main__':
+    main()
