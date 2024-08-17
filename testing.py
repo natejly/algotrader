@@ -12,6 +12,7 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime
 from analysis import cagr, sharpe_ratio
+import matplotlib.pyplot as plt
 
 
 def download_data(ticker, start, end, overwrite=False):
@@ -191,9 +192,15 @@ def main():
     add_signals(data, 20, 2)
     simulate_trades(data, 'Signal')
     print(data)
-
+    data['strategy'].plot()
+    plt.title('Combined Strategy Returns')
+    plt.xlabel('Date')
+    plt.ylabel('Returns')
+    plt.grid()
+    print(f"Strategy Returns: {data['strategy'].iloc[-1]}")
     print(f"CAGR: {cagr(data['strategy'])}")
     print(f"Sharpe: {sharpe_ratio(data['strategy pct change'])}")
+    plt.show()
 
 
 if __name__ == '__main__':
